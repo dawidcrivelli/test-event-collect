@@ -1,0 +1,17 @@
+{
+  "name": "https-test",
+  "version": "1.0.0",
+  "description": "",
+  "main": "https-test.js",
+  "dependencies": {
+    "body-parser": "^1.18.3",
+    "express": "^4.16.4"
+  },
+  "devDependencies": {},
+  "scripts": {
+    "start": "pm2 start --watch https-test"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC"
+}
