@@ -23,7 +23,7 @@ const insecureport = 4000
 const app = express()
 
 var rawBodySaver = function (req, res, buf, encoding) {
-    console.warn("Verifier called");
+    // console.warn("Verifier called");
     if (buf && buf.length) {
         req.rawBody = buf.toString(encoding || 'utf8');
     }
@@ -35,7 +35,7 @@ var rawBodySaver = function (req, res, buf, encoding) {
     }
 }
 
-app.use(bodyParser.json({ verify: rawBodySaver }));       // to support JSON-encoded bodies
+app.use(bodyParser.json({ limit: '50mb', extended: true, verify: rawBodySaver }));       // to support JSON-encoded bodies
 app.use(bodyParser.urlencoded({ extended: true })); // to support URL-encoded bodies
 app.use(bodyParser.text({ verify: rawBodySaver }));
 
@@ -170,12 +170,15 @@ function parseLocation(adv) {
     }]
 }
 
-
-
-
-
-
-
+function parseKontakt(adv) {
+    if (adv.data.includes(magicBits.tlm_magic)) {
+        return parseTelemetry(adv)
+    } else if (adv.data.includes(magicBits.secprofile_magic)) {
+        return parseKontaktProfile(adv)
+    } else if (adv.data.includes(magicBits.location_magic)) {
+        return parseLocation(adv)
+    }
+}
 
 function echo(req, res) {
     console.log('Method', req.method);
@@ -197,14 +200,14 @@ function api2normal(s) {
     return Buffer.from(s, 'base64').toString('hex')
 }
 // 'da:fb:81:c4:63:63', 'f3:c9:1b:0f:2f:3a', 'ce:1c:87:3a:da:f0', 'd3:c5:b0:e8:94:2c', 'f4:b8:5e:ac:5a:87', 'f4:b8:5e:ac:4e:68', 'e3:44:47:a3:9d:71', 'eb:5f:62:1c:90:07', '60:c0:bf:0d:6b:1b', 'e2:02:00:1e:e3:40', 'e2:02:00:2d:f4:40', 'e3:44:47:a3:9d:71', 'e8:7a:4c:fc:04:72',
-// 'ea:96:9d:79:41:64'
-const macs = new Set([ 'e0:7b:2d:b6:ae:f7'])
+
+const macs = new Set(['e0:7b:2d:b6:ae:f7', 'ea:96:9d:79:41:64'])
 
 function resp(req, res) {
     // console.log('Headers');
     // console.dir(req.headers);
     // console.log('Body ', req.rawBody && req.rawBody.length || "");
-    console.log(`Time: ${Math.round((new Date()).getTime() / 1000)}`);
+    console.log(`Request at time: ${Math.round((new Date()).getTime() / 1000)}`);
 
     let len = 0;
     let events = req.body.events
@@ -217,13 +220,10 @@ function resp(req, res) {
             ping.ble.data = api2normal(ping.ble.data)
             ping.ble.srData = api2normal(ping.ble.srData)
 
-            let adv = { rssi: ping.ble.rssi, data: Buffer.from(ping.ble.data, 'hex') }
-            if (adv.data.includes(magicBits.tlm_magic)) {
-                ping.ble.parsed = parseTelemetry(adv)
-            } else if (adv.data.includes(magicBits.secprofile_magic)) {
-                ping.ble.parsed = parseKontaktProfile(adv)
-            } else if (adv.data.includes(magicBits.location_magic)) {
-                ping.ble.parsed = parseLocation(adv)
+            if (ping.ble.data) {
+                let adv = { rssi: ping.rssi, data: Buffer.from(ping.ble.data, 'hex') }
+                delete ping.ble
+                ping.parsed = parseKontakt(adv)
             }
             console.log(ping)
 
