@@ -220,7 +220,10 @@ function resp(req, res) {
             let adv = { rssi: ping.ble.rssi, data: Buffer.from(ping.ble.data, 'hex') }
             if (adv.data.includes(magicBits.tlm_magic)) {
                 ping.ble.parsed = parseTelemetry(adv)
-                // console.log(ping)
+            } else if (adv.data.includes(magicBits.secprofile_magic)) {
+                ping.ble.parsed = parseKontaktProfile(adv)
+            } else if (adv.data.includes(magicBits.location_magic)) {
+                ping.ble.parsed = parseLocation(adv)
             }
             console.log(ping)
 
