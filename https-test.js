@@ -23,7 +23,7 @@ const insecureport = 4000
 const app = express()
 
 var rawBodySaver = function (req, res, buf, encoding) {
-    // console.warn("Verifier called");
+    console.warn("Verifier called");
     if (buf && buf.length) {
         req.rawBody = buf.toString(encoding || 'utf8');
     }
@@ -35,11 +35,12 @@ var rawBodySaver = function (req, res, buf, encoding) {
     }
 }
 
-app.use(bodyParser.json({ limit: '50mb', extended: true, verify: rawBodySaver }));       // to support JSON-encoded bodies
-app.use(bodyParser.urlencoded({ extended: true })); // to support URL-encoded bodies
-app.use(bodyParser.text({ verify: rawBodySaver }));
+app.use(bodyParser.json({ limit: '50mb',  verify: rawBodySaver }));       // to support JSON-encoded bodies
+// app.use(bodyParser.urlencoded({ extended: true })); // to support URL-encoded bodies
+// app.use(bodyParser.text({ verify: rawBodySaver }));
 
 
+console.log(`Starting application. Port HTTP: ${insecureport}, HTTPS: ${port}`)
 
 function parseTelemetry(adv) {
     let buffer = adv.data
@@ -208,7 +209,7 @@ function resp(req, res) {
     // console.dir(req.headers);
     // console.log('Body ', req.rawBody && req.rawBody.length || "");
     console.log(`Request at time: ${Math.round((new Date()).getTime() / 1000)}`);
-
+    console.log(req.body)
     let len = 0;
     let events = req.body.events
     // console.dir(req.body)
