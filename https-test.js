@@ -23,7 +23,7 @@ const insecureport = 4000
 const app = express()
 
 var rawBodySaver = function (req, res, buf, encoding) {
-    console.warn("Verifier called");
+    // console.warn("Verifier called");
     if (buf && buf.length) {
         req.rawBody = buf.toString(encoding || 'utf8');
     }
@@ -41,6 +41,24 @@ app.use(bodyParser.json({ limit: '50mb',  verify: rawBodySaver }));       // to 
 
 
 console.log(`Starting application. Port HTTP: ${insecureport}, HTTPS: ${port}`)
+
+const MODELS = {
+    1: 'Smart Beacon',
+    3: 'USB Beacon UB16-2',
+    4: 'Card Tag CT16-2',
+    5: 'Gateway GW16-2',
+    6: 'Beacon Pro BP16-3',
+    8: 'Asset Tag S18-3',
+    9: 'Smart Beacon SB18-3',
+    10: 'Heavy Duty Beacon HD18-3',
+    11: 'Card Tag CT18-3',
+    12: 'Coin Tag C18-3',
+    13: 'Smart Beacon with Humidity Sensor SB18-3H',
+    14: 'Tough Beacon TB18-2',
+    15: 'Bracelet Tag, BT18-3',
+    16: 'Universal Tag, UT19-1',
+    17: 'Bracelet Tag, BT19-4',
+}
 
 function parseTelemetry(adv) {
     let buffer = adv.data
@@ -145,30 +163,72 @@ function parseTelemetry(adv) {
                 break
         }
     }
-    return telemetryData
+    return {
+        uniqueId: null,
+        data: telemetryData,
+        type: 'telemetry',
+    }
 }
 
 function parseKontaktProfile(adv) {
     let buffer = adv.data.slice(8)
     let uniqueId = buffer.slice(5).toString('ascii')
-    let ret = [uniqueId, {
-        model: buffer.readUInt8(0),
-        batteryLevel: buffer.readUInt8(3),
-        txPower: buffer.readInt8(4),
-        firmware: buffer.readUInt8(2),
-        rssi: adv.rssi,
-    }]
-    return ret
+    return {
+        uniqueId,
+        data: {
+            model: buffer.readUInt8(0),
+            batteryLevel: buffer.readUInt8(3),
+            txPower: buffer.readInt8(4),
+            firmware: buffer.readUInt8(2),
+            rssi: adv.rssi,
+        },
+        type: 'secure_profile',
+    }
 }
 
 function parseLocation(adv) {
     let buffer = adv.data.slice(8)
-    let uniqueId = buffer.slice().toString('ascii')
-    return [uniqueId, {
-        txPower: buffer.readInt8(0),
-        channel: buffer.readUInt8(1),
-        rssi: adv.rssi,
-    }]
+    let uniqueId = buffer.slice(4).toString('ascii')
+    return {
+        uniqueId,
+        data: {
+            txPower: buffer.readInt8(0),
+            channel: buffer.readUInt8(1),
+            model: buffer.readUInt8(2),
+            flags: buffer.readUInt8(3),
+            rssi: adv.rssi,
+        },
+        type: 'location',
+    }
+}
+
+function parseDood(adv) {
+    let buffer = adv.data
+    let currentIndex = 0
+    while (currentIndex < buffer.length) {
+        const length = buffer.readUInt8(currentIndex)
+        const fieldID = buffer.readUInt8(currentIndex + 1)
+        const data = buffer.slice(currentIndex + 2, (currentIndex + 2) + length - 1)
+        currentIndex = currentIndex + (length + 1)
+
+        if (fieldID === 0x16 && data.readUInt16LE() === 0xd00d) {
+            let offset = 2
+
+            let uniqueId = data.slice(offset, offset + 4).toString()
+            offset += 4
+
+            let firmware = `${String.fromCharCode(data[offset])}.${String.fromCharCode(data[offset + 1])}`
+            offset += 2
+
+            let batteryLevel = data.readUInt8(offset)
+            return {
+                uniqueId,
+                data: { firmware, batteryLevel },
+                type: 'd00d',
+            }
+        }
+    }
+    return { uniqueId: null, type: null }
 }
 
 function parseKontakt(adv) {
@@ -178,8 +238,13 @@ function parseKontakt(adv) {
         return parseKontaktProfile(adv)
     } else if (adv.data.includes(magicBits.location_magic)) {
         return parseLocation(adv)
+    } else if (adv.data.includes(magicBits.dood_magic)) {
+        return parseDood(adv)
+    } else {
+        return { uniqueId: null, data: null, type: null }
     }
 }
+
 
 function echo(req, res) {
     console.log('Method', req.method);
@@ -202,35 +267,36 @@ function api2normal(s) {
 }
 // 'da:fb:81:c4:63:63', 'f3:c9:1b:0f:2f:3a', 'ce:1c:87:3a:da:f0', 'd3:c5:b0:e8:94:2c', 'f4:b8:5e:ac:5a:87', 'f4:b8:5e:ac:4e:68', 'e3:44:47:a3:9d:71', 'eb:5f:62:1c:90:07', '60:c0:bf:0d:6b:1b', 'e2:02:00:1e:e3:40', 'e2:02:00:2d:f4:40', 'e3:44:47:a3:9d:71', 'e8:7a:4c:fc:04:72',
 
-const macs = new Set(['e0:7b:2d:b6:ae:f7', 'ea:96:9d:79:41:64'])
+const macs = new Set(['ea:96:9d:79:41:64', 'c1:c9:10:80:67:10'])
 
 function resp(req, res) {
     // console.log('Headers');
     // console.dir(req.headers);
     // console.log('Body ', req.rawBody && req.rawBody.length || "");
-    console.log(`Request at time: ${Math.round((new Date()).getTime() / 1000)}`);
-    console.log(req.body)
+    let time = Date.now() / 1000
+    // console.log(`Request at time: ${Math.round((new Date()).getTime() / 1000)}`);
     let len = 0;
     let events = req.body.events
     // console.dir(req.body)
     if (events) {
         len = events.length;
-        let interesting = events.filter((e) => e.ble && macs.has(e.ble.deviceAddress.toLowerCase()))
-        interesting = interesting.filter((e) => e.eventType !== 'LOST')
+        let interesting = events.filter(e => macs.has(e.deviceAddress.toLowerCase()))
         for (let ping of interesting) {
-            ping.ble.data = api2normal(ping.ble.data)
-            ping.ble.srData = api2normal(ping.ble.srData)
+            ping.data = api2normal(ping.data)
+            ping.srData = api2normal(ping.srData)
 
-            if (ping.ble.data) {
-                let adv = { rssi: ping.rssi, data: Buffer.from(ping.ble.data, 'hex') }
-                delete ping.ble
-                ping.parsed = parseKontakt(adv)
+            if (ping.data) {
+                let adv = { rssi: ping.rssi, data: Buffer.from(ping.data, 'hex') }
+                let result = parseKontakt(adv)
+                if (result && result.data) {
+                    console.log(time, result.uniqueId, result.data)
+                }
             }
-            console.log(ping)
 
         }
-
-        console.log(`Received ${len} scan events`);
+        if (interesting.length == 0) {
+            console.log(`Received ${len} scan events`);
+        }
     }
     let backresponse = {
         length: len,
