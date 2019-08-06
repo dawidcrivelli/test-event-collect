@@ -265,9 +265,8 @@ function api2normal(s) {
     if (!s) return ''
     return Buffer.from(s, 'base64').toString('hex')
 }
-// 'da:fb:81:c4:63:63', 'f3:c9:1b:0f:2f:3a', 'ce:1c:87:3a:da:f0', 'd3:c5:b0:e8:94:2c', 'f4:b8:5e:ac:5a:87', 'f4:b8:5e:ac:4e:68', 'e3:44:47:a3:9d:71', 'eb:5f:62:1c:90:07', '60:c0:bf:0d:6b:1b', 'e2:02:00:1e:e3:40', 'e2:02:00:2d:f4:40', 'e3:44:47:a3:9d:71', 'e8:7a:4c:fc:04:72',
 
-const macs = new Set(['ea:96:9d:79:41:64', 'c1:c9:10:80:67:10'])
+const macs = new Set([])
 
 function resp(req, res) {
     // console.log('Headers');
@@ -280,7 +279,7 @@ function resp(req, res) {
     // console.dir(req.body)
     if (events) {
         len = events.length;
-        let interesting = events.filter(e => macs.has(e.deviceAddress.toLowerCase()))
+        let interesting = (macs.size) ? events.filter(e => macs.has(e.deviceAddress.toLowerCase())) : events
         for (let ping of interesting) {
             ping.data = api2normal(ping.data)
             ping.srData = api2normal(ping.srData)
