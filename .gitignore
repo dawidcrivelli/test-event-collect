@@ -1,0 +1,17 @@
+/node_modules
+/.env
+/vendor
+.vscode
+.DS_Store
+/package-lock.json
+.snapcraft
+build
+stage
+prime
+parts
+test
+*.snap
+*.bin
+test-*.js
+gateway*.t*gz
+gatewaypackage*

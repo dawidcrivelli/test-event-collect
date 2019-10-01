@@ -300,7 +300,6 @@ function resp(req, res) {
     let backresponse = {
         length: len,
     };
-    console.log('');
     res.status(201).send(backresponse);
 }
 
