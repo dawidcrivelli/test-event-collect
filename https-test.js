@@ -19,7 +19,7 @@ const options = {
     cert: fs.readFileSync('client-cert.pem')
 };
 const port = 4443
-const insecureport = 4000
+const insecureport = 4123
 const app = express()
 
 var rawBodySaver = function (req, res, buf, encoding) {
@@ -257,7 +257,7 @@ function echo(req, res) {
     console.dir(req.query);
     console.log(`Time: ${Math.round((new Date()).getTime() / 1000)}`);
 
-    let backresponse = { path: req.path, headers: req.headers, body: req.body, query: req.query};
+    let backresponse = {}; //{ path: req.path, headers: req.headers, body: req.body, query: req.query};
     res.status(200).send(backresponse);
 }
 
@@ -303,8 +303,8 @@ function resp(req, res) {
     res.status(201).send(backresponse);
 }
 
-app.all('/echo', echo);
-app.all('/*', resp);
+app.all('/event/collect', resp);
+app.all('/*', echo);
 
 let httpsServer = https.createServer(options, app);
 httpsServer.listen(port);
